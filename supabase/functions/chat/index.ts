@@ -11,6 +11,14 @@ interface RequestBody {
   sessionId: string;
 }
 
+interface Note {
+  id: string;
+  title: string;
+  subject: string;
+  content_text: string;
+  description: string;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -24,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { message, sessionId }: RequestBody = await req.json();
+    const { message }: RequestBody = await req.json();
 
     const { data: notes, error: notesError } = await supabase
       .from('study_notes')
@@ -33,7 +41,7 @@ Deno.serve(async (req: Request) => {
 
     if (notesError) throw notesError;
 
-    const relevantNotes = findRelevantNotes(message, notes || []);
+    const relevantNotes = findRelevantNotes(message, (notes as Note[]) || []);
 
     const context = relevantNotes
       .map(note => `Title: ${note.title}\nSubject: ${note.subject}\nContent: ${note.content_text || note.description}`)
@@ -58,10 +66,11 @@ Deno.serve(async (req: Request) => {
         },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 500,
         headers: {
@@ -73,7 +82,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function findRelevantNotes(query: string, notes: any[]): any[] {
+function findRelevantNotes(query: string, notes: Note[]): Note[] {
   const queryLower = query.toLowerCase();
   const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
 
@@ -101,7 +110,7 @@ function findRelevantNotes(query: string, notes: any[]): any[] {
     .map(item => item.note);
 }
 
-function generateResponse(query: string, context: string, relevantNotes: any[]): string {
+function generateResponse(query: string, context: string, relevantNotes: Note[]): string {
   const queryLower = query.toLowerCase();
 
   if (queryLower.includes('what') || queryLower.includes('explain') || queryLower.includes('define')) {

@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, StudyNote } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Upload, FileText, Trash2, LogOut, Search, Download } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Set worker source for PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 export default function StaffDashboard() {
   const { profile, signOut } = useAuth();
@@ -16,11 +20,7 @@ export default function StaffDashboard() {
   const [subject, setSubject] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  useEffect(() => {
-    loadNotes();
-  }, []);
-
-  const loadNotes = async () => {
+  const loadNotes = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('study_notes')
@@ -35,7 +35,11 @@ export default function StaffDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id]);
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,18 +85,45 @@ export default function StaffDashboard() {
       setFile(null);
       setShowUploadModal(false);
       loadNotes();
-    } catch (error: any) {
-      alert('Error uploading file: ' + error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert('Error uploading file: ' + error.message);
+      } else {
+        alert('An unknown error occurred uploading file');
+      }
     } finally {
       setUploading(false);
     }
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    if (file.type === 'text/plain') {
-      return await file.text();
+    try {
+      if (file.type === 'text/plain') {
+        return await file.text();
+      }
+
+      if (file.type === 'application/pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          fullText += pageText + '\n\n';
+        }
+
+        return fullText.trim();
+      }
+
+      return '';
+    } catch (error) {
+      console.error('Error extracting text:', error);
+      return '';
     }
-    return '';
   };
 
   const handleDelete = async (noteId: string, fileUrl: string) => {
@@ -112,8 +143,12 @@ export default function StaffDashboard() {
 
       if (error) throw error;
       loadNotes();
-    } catch (error: any) {
-      alert('Error deleting note: ' + error.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        alert('Error deleting note: ' + error.message);
+      } else {
+        alert('An unknown error occurred deleting note');
+      }
     }
   };
 
@@ -135,15 +170,15 @@ export default function StaffDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">Staff Dashboard</h1>
-              <p className="text-sm text-slate-600 mt-1">Welcome, {profile?.full_name}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Staff Dashboard</h1>
+              <p className="text-sm text-slate-600 mt-1 hidden sm:block">Welcome, {profile?.full_name}</p>
             </div>
             <button
               onClick={() => signOut()}
-              className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
             >
               <LogOut className="w-4 h-4" />
-              Sign Out
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>
@@ -163,10 +198,10 @@ export default function StaffDashboard() {
           </div>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+            className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
           >
             <Upload className="w-5 h-5" />
-            Upload Note
+            <span className="hidden sm:inline">Upload Note</span>
           </button>
         </div>
 

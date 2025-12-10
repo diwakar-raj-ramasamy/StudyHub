@@ -1,0 +1,29 @@
+﻿
+> study-notes-chatbot@0.0.0 lint
+> eslint .
+
+
+C:\Users\Dell\OneDrive\Documents\study notes chatbot\src\components\AuthForm.tsx
+  26:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Dell\OneDrive\Documents\study notes chatbot\src\components\Chatbot.tsx
+   21:6   warning  React Hook useEffect has a missing dependency: 'loadSessions'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  152:21  error    Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+
+C:\Users\Dell\OneDrive\Documents\study notes chatbot\src\components\StaffDashboard.tsx
+   21:6   warning  React Hook useEffect has a missing dependency: 'loadNotes'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   84:21  error    Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+  115:21  error    Unexpected any. Specify a different type                                                                      @typescript-eslint/no-explicit-any
+
+C:\Users\Dell\OneDrive\Documents\study notes chatbot\src\contexts\AuthContext.tsx
+  106:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\Dell\OneDrive\Documents\study notes chatbot\supabase\functions\chat\index.ts
+   27:22  error  'sessionId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   61:19  error  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   76:50  error  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   76:58  error  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+  104:74  error  Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+
+Γ£û 12 problems (9 errors, 3 warnings)
+

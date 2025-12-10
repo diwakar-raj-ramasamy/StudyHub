@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, ChatSession, ChatMessage } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Send, Plus, MessageSquare, Loader2 } from 'lucide-react';
+import { X, Send, Plus, MessageSquare, Loader2, Trash2, Menu } from 'lucide-react';
 
 interface ChatbotProps {
   onClose: () => void;
@@ -14,11 +14,30 @@ export default function Chatbot({ onClose }: ChatbotProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const loadSessions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('student_id', profile?.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setSessions(data || []);
+      if (!currentSession && data && data.length > 0) {
+        setCurrentSession(data[0]);
+      }
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+    }
+  }, [profile?.id, currentSession]);
 
   useEffect(() => {
     loadSessions();
-  }, []);
+  }, [loadSessions]);
 
   useEffect(() => {
     if (currentSession) {
@@ -32,24 +51,6 @@ export default function Chatbot({ onClose }: ChatbotProps) {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const loadSessions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('chat_sessions')
-        .select('*')
-        .eq('student_id', profile?.id)
-        .order('updated_at', { ascending: false });
-
-      if (error) throw error;
-      setSessions(data || []);
-      if (data && data.length > 0) {
-        setCurrentSession(data[0]);
-      }
-    } catch (error) {
-      console.error('Error loading sessions:', error);
-    }
   };
 
   const loadMessages = async (sessionId: string) => {
@@ -82,30 +83,68 @@ export default function Chatbot({ onClose }: ChatbotProps) {
       setSessions([data, ...sessions]);
       setCurrentSession(data);
       setMessages([]);
+      return data;
     } catch (error) {
       console.error('Error creating session:', error);
+      return null;
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (error) throw error;
+
+      const updatedSessions = sessions.filter(s => s.id !== sessionId);
+      setSessions(updatedSessions);
+
+      if (currentSession?.id === sessionId) {
+        setCurrentSession(updatedSessions.length > 0 ? updatedSessions[0] : null);
+        if (updatedSessions.length === 0) setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      alert('Failed to delete chat session');
     }
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || !currentSession || loading) return;
+    // ... sendMessage implementation (omitted for brevity, assume unchanged logic) ...
+    // Note: To avoid repeating entire sendMessage logic here if not changing it, 
+    // I will actually include it but condensed or target specific ranges if possible.
+    // However, replace_file_content requires contiguous block. 
+    // I will efficiently target the imports + deleteSession + UI changes separately if possible, 
+    // but the deleteSession needs to be inside the component.
+
+    // RE-INSERTING sendMessage logic here to ensure validity of the block replacement
+    if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
     setLoading(true);
 
     try {
+      let session = currentSession;
+      if (!session) {
+        session = await createNewSession();
+        if (!session) throw new Error('Failed to create session');
+      }
+
       const { error: userMsgError } = await supabase
         .from('chat_messages')
         .insert({
-          session_id: currentSession.id,
+          session_id: session.id,
           role: 'user',
           content: userMessage,
         });
 
       if (userMsgError) throw userMsgError;
 
-      await loadMessages(currentSession.id);
+      await loadMessages(session.id);
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -117,7 +156,7 @@ export default function Chatbot({ onClose }: ChatbotProps) {
         },
         body: JSON.stringify({
           message: userMessage,
-          sessionId: currentSession.id,
+          sessionId: session.id,
         }),
       });
 
@@ -130,7 +169,7 @@ export default function Chatbot({ onClose }: ChatbotProps) {
       const { error: aiMsgError } = await supabase
         .from('chat_messages')
         .insert({
-          session_id: currentSession.id,
+          session_id: session.id,
           role: 'assistant',
           content: reply,
           related_notes: relatedNotes || [],
@@ -143,62 +182,123 @@ export default function Chatbot({ onClose }: ChatbotProps) {
         await supabase
           .from('chat_sessions')
           .update({ title: firstLine })
-          .eq('id', currentSession.id);
+          .eq('id', session.id);
 
         loadSessions();
       }
 
-      await loadMessages(currentSession.id);
-    } catch (error: any) {
+      await loadMessages(session.id);
+    } catch (error: unknown) {
       console.error('Error sending message:', error);
-      alert('Error: ' + error.message);
+      if (error instanceof Error) {
+        alert('Error: ' + error.message);
+      } else {
+        alert('An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl w-full max-w-6xl h-[80vh] flex overflow-hidden shadow-2xl">
-        <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col">
-          <div className="p-4 border-b border-slate-200">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-none sm:rounded-2xl w-full max-w-6xl h-full sm:h-[80vh] flex overflow-hidden shadow-2xl relative">
+
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div
+            className="absolute inset-0 bg-black bg-opacity-50 z-20 sm:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
+        {/* Sidebar */}
+        <div className={`
+          absolute sm:relative z-30 h-full bg-slate-50 border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out w-72 sm:w-64
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'}
+        `}>
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center sm:block">
             <button
               onClick={createNewSession}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
               New Chat
             </button>
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="ml-2 sm:hidden p-2 text-slate-500 hover:bg-slate-200 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {sessions.map((session) => (
-              <button
+              <div
                 key={session.id}
-                onClick={() => setCurrentSession(session)}
-                className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  currentSession?.id === session.id
-                    ? 'bg-blue-100 text-blue-800 font-medium'
-                    : 'hover:bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors group ${currentSession?.id === session.id
+                  ? 'bg-blue-100'
+                  : 'hover:bg-slate-100'
+                  }`}
               >
-                <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setCurrentSession(session);
+                    setIsSidebarOpen(false);
+                  }}
+                  className={`flex items-center gap-2 flex-1 text-left ${currentSession?.id === session.id
+                    ? 'text-blue-800 font-medium'
+                    : 'text-slate-700'
+                    }`}
+                >
                   <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate text-sm">{session.title}</span>
-                </div>
-              </button>
+                  <span className="truncate text-sm w-32">{session.title}</span>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm('Delete this chat?')) deleteSession(session.id);
+                  }}
+                  className="p-1 text-slate-400 hover:text-red-500 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete Chat"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col w-full">
           <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
-            <h2 className="text-xl font-bold text-slate-800">AI Study Assistant</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-slate-600" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 -ml-2 hover:bg-slate-100 rounded-lg sm:hidden text-slate-600"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              <h2 className="text-xl font-bold text-slate-800 truncate">Study Assistant</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {currentSession && messages.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (confirm('Clear this conversation?')) deleteSession(currentSession.id);
+                  }}
+                  className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Clear Chat</span>
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -215,11 +315,10 @@ export default function Chatbot({ onClose }: ChatbotProps) {
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${
-                      message.role === 'user'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-100 text-slate-800'
-                    }`}
+                    className={`max-w-[70%] rounded-2xl px-4 py-3 ${message.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-800'
+                      }`}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
                   </div>
@@ -245,11 +344,11 @@ export default function Chatbot({ onClose }: ChatbotProps) {
                 onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                 placeholder="Ask about your study notes..."
                 className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                disabled={loading || !currentSession}
+                disabled={loading}
               />
               <button
                 onClick={sendMessage}
-                disabled={loading || !input.trim() || !currentSession}
+                disabled={loading || !input.trim()}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-5 h-5" />

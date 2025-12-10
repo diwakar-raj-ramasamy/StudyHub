@@ -36,8 +36,8 @@ export default function StudentDashboard() {
 
   const filteredNotes = notes.filter(note => {
     const matchesSearch = note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         note.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         note.description.toLowerCase().includes(searchTerm.toLowerCase());
+      note.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      note.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSubject = selectedSubject === 'all' || note.subject === selectedSubject;
     return matchesSearch && matchesSubject;
   });
@@ -66,24 +66,24 @@ export default function StudentDashboard() {
                 <BookOpen className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-800">StudyHub</h1>
-                <p className="text-sm text-slate-600">Welcome, {profile?.full_name}</p>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-800">StudyHub</h1>
+                <p className="text-sm text-slate-600 hidden sm:block">Welcome, {profile?.full_name}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => setShowChat(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200"
               >
                 <MessageSquare className="w-5 h-5" />
-                AI Assistant
+                <span className="hidden sm:inline">AI Assistant</span>
               </button>
               <button
                 onClick={() => signOut()}
-                className="flex items-center gap-2 px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                Sign Out
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
             </div>
           </div>
@@ -108,11 +108,10 @@ export default function StudentDashboard() {
               <button
                 key={subject}
                 onClick={() => setSelectedSubject(subject)}
-                className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                  selectedSubject === subject
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:border-blue-300'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${selectedSubject === subject
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-blue-300'
+                  }`}
               >
                 {subject.charAt(0).toUpperCase() + subject.slice(1)}
               </button>

@@ -23,8 +23,15 @@ export default function AuthForm() {
       } else {
         await signUp(email, password, fullName, role);
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err: unknown) {
+      console.error('Sign up error:', err);
+      if (err instanceof Error) {
+        setError(err.message);
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        setError((err as { message: string }).message);
+      } else {
+        setError('An error occurred during sign up');
+      }
     } finally {
       setLoading(false);
     }
@@ -44,21 +51,19 @@ export default function AuthForm() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setIsLogin(true)}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-              isLogin
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
+            className={`flex-1 py-2 rounded-lg font-medium transition-all ${isLogin
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
           >
             Login
           </button>
           <button
             onClick={() => setIsLogin(false)}
-            className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-              !isLogin
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
+            className={`flex-1 py-2 rounded-lg font-medium transition-all ${!isLogin
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
           >
             Sign Up
           </button>
